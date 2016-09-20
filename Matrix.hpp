@@ -245,24 +245,45 @@ Matrix<T> Matrix<T>::operator*(const Matrix<T> &oMat) const
     {
         throw std::range_error("Matrix dimensions incompatible");
     }
-//    int numthreads = isParallel ? concurentThreadsSupported : 1;
+
     int n = this->myRows;
     int m = this->myCols;
     int p = oMat.myCols;
     Matrix<T> temp = Matrix(n, p);
 
+    int numthreads = isParallel ? concurentThreadsSupported : 1;
+    int rowsToProc = n;
     std::vector<std::future<std::vector<T>>> threads;
 
-    for (int i = 0; i < n; i++)
-    {
-        threads.push_back(std::async(Matrix<T>::multHelper,*this, oMat, i, m, p));
-    }
     temp.elements.clear();
-    for (int i = 0; i < n; i++)
+
+    int i=0;
+    while (rowsToProc > 0)
     {
-        std::vector<T> tempVec = threads[i].get();
-        temp.elements.insert(temp.elements.end(), tempVec.begin(), tempVec.end());
+        for (int j =i; j< i+numthreads && j < n; j++)
+        {
+            threads.push_back(std::async(Matrix<T>::multHelper,*this, oMat, j, m, p));
+        }
+
+        for (int j =i; j< i+numthreads && j < n; j++)
+        {
+            std::vector<T> tempVec = threads[j].get();
+            temp.elements.insert(temp.elements.end(), tempVec.begin(), tempVec.end());
+        }
+        i+= numthreads;
+        rowsToProc -= numthreads;
     }
+
+//    for (int i = 0; i < n; i++)
+//    {
+//        threads.push_back(std::async(Matrix<T>::multHelper,*this, oMat, i, m, p));
+//    }
+//    temp.elements.clear();
+//    for (int i = 0; i < n; i++)
+//    {
+//        std::vector<T> tempVec = threads[i].get();
+//        temp.elements.insert(temp.elements.end(), tempVec.begin(), tempVec.end());
+//    }
 
     return temp;
 
@@ -297,19 +318,41 @@ Matrix<T> Matrix<T>::operator+(const Matrix<T> &oMat) const
     }
     int n = this->myRows;
     int m = this->myCols;
+    int numthreads = isParallel ? concurentThreadsSupported : 1;
+    int rowsToProc = n;
     std::vector<std::future<std::vector<T>>> threads;
+
     Matrix<T> temp = Matrix(n, m);
+    temp.elements.clear();
 
-    for (int i = 0; i < n; i++)
+    int i=0;
+    while (rowsToProc > 0)
     {
-        threads.push_back(std::async(Matrix<T>::addHelper,*this, oMat, i, m));
+        for (int j =i; j< i+numthreads && j < n; j++)
+        {
+            threads.push_back(std::async(Matrix<T>::addHelper,*this, oMat, j, m));
+        }
+
+        for (int j =i; j< i+numthreads && j < n; j++)
+        {
+            std::vector<T> tempVec = threads[j].get();
+            temp.elements.insert(temp.elements.end(), tempVec.begin(), tempVec.end());
+        }
+        i+= numthreads;
+        rowsToProc -= numthreads;
     }
 
-    for (int i = 0; i < n; i++)
-    {
-        std::vector<T> tempVec = threads[i].get();
-        temp.elements.insert(temp.elements.end(), tempVec.begin(), tempVec.end());
-    }
+
+//    for (int i = 0; i < n; i++)
+//    {
+//        threads.push_back(std::async(Matrix<T>::addHelper,*this, oMat, i, m));
+//    }
+//
+//    for (int i = 0; i < n; i++)
+//    {
+//        std::vector<T> tempVec = threads[i].get();
+//        temp.elements.insert(temp.elements.end(), tempVec.begin(), tempVec.end());
+//    }
 
     return temp;
 
