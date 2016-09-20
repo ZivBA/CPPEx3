@@ -23,11 +23,15 @@ public:
     unsigned myCols;  // number of columns
 
 private:
-
+    static std::launch lPolicy;
     static bool isParallel;
     std::vector<T> elements; // array of elements
     // number of available logical threads;
     unsigned concurentThreadsSupported = std::thread::hardware_concurrency();
+
+    static std::vector<T> addHelper(const Matrix<T> *a, const Matrix<T> *b, unsigned int row);
+
+    static std::vector<T> multHelper(const Matrix<T> *a, const Matrix<T> *b, unsigned int row);
 
 
 protected:
@@ -46,6 +50,17 @@ public:
                       (isPar ? "Parallel" : "non-Parallel") <<
                       " mode." << std::endl;
         }
+
+        if (isParallel)
+        {
+            lPolicy = std::launch::async;
+        }
+        else
+        {
+            lPolicy = std::launch::deferred;
+        }
+
+
     }
 
     typedef typename std::vector<T>::const_iterator const_iterator;
@@ -83,12 +98,6 @@ public:
         return elements[i * myCols + j];
     }
 
-    static std::vector<T>
-    multHelper(const Matrix<T> &pMatrix, const Matrix<T> &pMatrix1, const int i, const int m,
-               const int p) ;
-
-    static std::vector<T>
-    addHelper(const Matrix<T> &a, const Matrix<T> &b, const int i, const int m) ;
 
     // constructors
     Matrix();
@@ -97,7 +106,7 @@ public:
 
     Matrix(const Matrix<T> &);
 
-    Matrix( Matrix<T> &&);
+    Matrix(Matrix<T> &&);
 
     Matrix(unsigned int rows, unsigned int cols, const std::vector<T> &cells);
 
@@ -127,41 +136,48 @@ public:
     // Other stuff
     bool isSquareMatrix() const;
 
-     unsigned int rows() const
+    unsigned int rows() const
     {
         return myRows;
     }
 
-     unsigned int cols()
+    unsigned int cols()
     {
         return myCols;
     }
 
 
     Matrix<T> trans() const;
+
     //iterator
     const_iterator begin();
 
     const_iterator end();
 
     //stream
-    friend std::ostream& operator<<(std::ostream& os, const Matrix<T>& mat)
+    friend std::ostream &operator<<(std::ostream &os, const Matrix<T> &mat)
     {
         for (unsigned i = 0; i < mat.myRows; i++)
         {
             for (unsigned j = 0; j < mat.myCols; j++)
             {
-                os << mat(i,j) << "\t";
+                os << mat(i, j) << "\t";
             }
             os << std::endl;
         }
         return os;
     }
+
+
 };
 
 
+template<class T> bool Matrix<T>::isParallel = false;
+
+template<class T> std::launch Matrix<T>::lPolicy = std::launch::deferred;
+
 template<class T>
-Matrix<T>::Matrix() :  myRows(1) ,myCols(1), elements((0.0))
+Matrix<T>::Matrix() :  myRows(1), myCols(1), elements(1, T(0.0))
 {
 }
 
@@ -207,7 +223,7 @@ Matrix<T> &Matrix<T>::operator=(const Matrix<T> &cp)
     this->myCols = cp.myCols;
     this->myRows = cp.myRows;
     elements.clear();
-    elements.assign(cp.elements.begin(),cp.elements.end());
+    elements.assign(cp.elements.begin(), cp.elements.end());
 
     return *this;
 }
@@ -224,6 +240,7 @@ void Matrix<T>::range_check(unsigned i, unsigned j) const
         throw std::range_error("Matrix access col out of range");
     }
 }
+
 template<class T>
 bool Matrix<T>::isSquareMatrix() const
 {
@@ -247,67 +264,53 @@ Matrix<T> Matrix<T>::operator*(const Matrix<T> &oMat) const
     }
 
     int n = this->myRows;
-    int m = this->myCols;
     int p = oMat.myCols;
     Matrix<T> temp = Matrix(n, p);
 
-    int numthreads = isParallel ? concurentThreadsSupported : 1;
-    int rowsToProc = n;
-    std::vector<std::future<std::vector<T>>> threads;
+//    int numthreads = isParallel ? concurentThreadsSupported / 2 : 1;
+//    int rowsToProc = n;
+    std::vector<std::future<std::vector<T>>> threads(n);
 
-    temp.elements.clear();
-
-    int i=0;
-    while (rowsToProc > 0)
+    for (int i = 0; i < n; i++)
     {
-        for (int j =i; j< i+numthreads && j < n; j++)
-        {
-            threads.push_back(std::async(Matrix<T>::multHelper,*this, oMat, j, m, p));
-        }
+        threads[i] = std::async(lPolicy, multHelper, this, &oMat, i);
 
-        for (int j =i; j< i+numthreads && j < n; j++)
-        {
-            std::vector<T> tempVec = threads[j].get();
-            temp.elements.insert(temp.elements.end(), tempVec.begin(), tempVec.end());
-        }
-        i+= numthreads;
-        rowsToProc -= numthreads;
     }
 
-//    for (int i = 0; i < n; i++)
-//    {
-//        threads.push_back(std::async(Matrix<T>::multHelper,*this, oMat, i, m, p));
-//    }
-//    temp.elements.clear();
-//    for (int i = 0; i < n; i++)
-//    {
-//        std::vector<T> tempVec = threads[i].get();
-//        temp.elements.insert(temp.elements.end(), tempVec.begin(), tempVec.end());
-//    }
+    std::vector<T> tempVec;
+    for (int i = 0; i < n; i++)
+    {
+        tempVec = threads[i].get();
+        for (unsigned j = 0; j < tempVec.size(); j++)
+        {
+            temp.elements[i * p + j] = tempVec[j];
+        }
+    }
+    return temp;
+
+}
+
+template<class T>
+std::vector<T>
+Matrix<T>::multHelper(const Matrix<T> *a, const Matrix<T> *b, unsigned int row)
+{
+    int m = a->myCols;
+    int p = b->myCols;
+    std::vector<T> temp(p);
+    for (int j = 0; j < p; j++)
+    {
+        T sum = T(0.0);
+        for (int k = 0; k < m; k++)
+        {
+            sum += a->operator()(row, k) * b->operator()(k, j);
+        }
+        temp[j] = sum;
+    }
 
     return temp;
 
-
 }
 
-
-template<class T>
- std::vector<T>
-Matrix<T>::multHelper(const Matrix &a, const Matrix &b, const int i, const int m, const int p)
-{
-    std::vector<T> resultLine;
-    for (int j = 0; j < p; j++)
-    {
-        T sum = 0.0;
-        for (int k = 0; k < m; k++)
-        {
-            sum += a(i, k) * b(k, j);
-        }
-        resultLine.push_back(sum);
-    }
-    return resultLine;
-
-}
 
 template<class T>
 Matrix<T> Matrix<T>::operator+(const Matrix<T> &oMat) const
@@ -318,59 +321,44 @@ Matrix<T> Matrix<T>::operator+(const Matrix<T> &oMat) const
     }
     int n = this->myRows;
     int m = this->myCols;
-    int numthreads = isParallel ? concurentThreadsSupported : 1;
-    int rowsToProc = n;
-    std::vector<std::future<std::vector<T>>> threads;
+//    int numthreads = isParallel ? concurentThreadsSupported /2 : 1;
+//    int rowsToProc = n;
+    std::vector<std::future<std::vector<T>>> threads(n);
 
     Matrix<T> temp = Matrix(n, m);
-    temp.elements.clear();
 
-    int i=0;
-    while (rowsToProc > 0)
+    for (int i = 0; i < n; i++)
     {
-        for (int j =i; j< i+numthreads && j < n; j++)
-        {
-            threads.push_back(std::async(Matrix<T>::addHelper,*this, oMat, j, m));
-        }
-
-        for (int j =i; j< i+numthreads && j < n; j++)
-        {
-            std::vector<T> tempVec = threads[j].get();
-            temp.elements.insert(temp.elements.end(), tempVec.begin(), tempVec.end());
-        }
-        i+= numthreads;
-        rowsToProc -= numthreads;
+        threads[i] = std::async(lPolicy, addHelper, this, &oMat, i);
     }
-
-
-//    for (int i = 0; i < n; i++)
-//    {
-//        threads.push_back(std::async(Matrix<T>::addHelper,*this, oMat, i, m));
-//    }
-//
-//    for (int i = 0; i < n; i++)
-//    {
-//        std::vector<T> tempVec = threads[i].get();
-//        temp.elements.insert(temp.elements.end(), tempVec.begin(), tempVec.end());
-//    }
-
+    std::vector<T> tempVec;
+    for (int i = 0; i < n; i++)
+    {
+        tempVec = threads[i].get();
+        for (unsigned j = 0; j < tempVec.size(); j++)
+        {
+            temp.elements[i * m + j] = tempVec[j];
+        }
+    }
     return temp;
 
 
 }
 
 template<class T>
- std::vector<T>
-Matrix<T>::addHelper(const Matrix &a, const Matrix &b, const int i, const int m)
-
+std::vector<T> Matrix<T>::addHelper(const Matrix<T> *a, const Matrix<T> *b, unsigned int row)
 {
-    std::vector<T> tempVec;
+    int m = a->myCols;
+    std::vector<T> temp(m);
     for (int j = 0; j < m; j++)
     {
-        tempVec.push_back(a(i, j) + b(i, j));
+        temp[j] = a->operator()(row, j) + b->operator()(row, j);
     }
-    return tempVec;
+
+    return temp;
+
 }
+
 
 template<class T>
 Matrix<T> Matrix<T>::operator-(const Matrix &oMat) const
@@ -401,7 +389,7 @@ Matrix<T> Matrix<T>::trans() const
     std::vector<T> newMatVec;
     for (int i = this->myRows - 1; i >= 0; i--)
     {
-        for (int j = this->myCols-1; j >= 0; j--)
+        for (int j = this->myCols - 1; j >= 0; j--)
         {
             newMatVec.push_back(elements[i * myCols + j]);
         }
@@ -424,9 +412,6 @@ typename std::vector<T>::const_iterator Matrix<T>::end()
 }
 
 
-
-template<> bool Matrix<Complex>::isParallel = false;
-
 template<>
 Matrix<Complex> Matrix<Complex>::trans() const
 {
@@ -437,12 +422,11 @@ Matrix<Complex> Matrix<Complex>::trans() const
     std::vector<Complex> newMatVec;
     for (int i = this->myRows - 1; i >= 0; i--)
     {
-        for (int j = this->myCols-1; j >= 0; j--)
+        for (int j = this->myCols - 1; j >= 0; j--)
         {
             newMatVec.push_back(elements[i * myCols + j]);
         }
     }
-
 
 
     Matrix<Complex> tempMat(n, m, newMatVec);
@@ -452,7 +436,7 @@ Matrix<Complex> Matrix<Complex>::trans() const
     {
         for (unsigned j = 0; j < this->myCols; j++)
         {
-            tempMat(i,j) = tempMat(i,j).conj() ;
+            tempMat(i, j) = tempMat(i, j).conj();
         }
     }
     return tempMat;
