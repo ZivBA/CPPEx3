@@ -1,6 +1,6 @@
 /**
  * A driver for testing the implementation of the Matrix.hpp file which is
- * an implementationf of a generic (template) matrix
+ * an implementationf of a generic (template) Matrix
  */
 #include <iostream>
 #include <cassert>
@@ -29,7 +29,7 @@
 
 #define NUM_KNOWN_FIELDS 3
 
-const std::string OPERATIONS[6] = {"matrix + matrix", "matrix * matrix", "transpose"};
+const std::string OPERATIONS[6] = {"Matrix + Matrix", "Matrix * Matrix", "transpose"};
 const int NUM_OPS = 3;
 
 const std::string FIELD_NAMES[3] = {"ints", "Doubles", "Complexs"};
@@ -60,7 +60,7 @@ const T readScalarLine();
 int main()
 {
 
-	std::cout << "Choose the scalar field of the components of the matrix" << std::endl;
+	std::cout << "Choose the scalar field of the components of the Matrix" << std::endl;
 	std::cout << "(" << INT << " for ints, " << DOUBLE << " for double or " 
 		  << COMPLEX << " for Complex):" << std::endl;
 	getline(std::cin, g_line);
@@ -136,14 +136,14 @@ template <typename T>
 void unaryOperation(const int operatorChoice)
 {
 	std::cout << "Operation " << OPERATIONS[operatorChoice-1] 
-		  << " requires 1 operand matrix." << std::endl;
+		  << " requires 1 operand Matrix." << std::endl;
 
-	// Read the matrix information:
+	// Read the Matrix information:
 	int rows, cols;
 	std::vector<T> cells;
 	readMatrixInfo(rows, cols, cells);
 	Matrix<T> m(rows, cols, cells);
-	std::cout << MAT_LINE << std::endl << "got matrix:" << std::endl;
+	std::cout << MAT_LINE << std::endl << "got Matrix:" << std::endl;
 	std::cout << m;
 
 	Matrix<T> resultMat;
@@ -157,18 +157,18 @@ void unaryOperation(const int operatorChoice)
 /*	 case TRACE:
 		 if (m.isSquareMatrix())
 		 {
-			 std::cout << "The matrix is square and its trace is " << m.trace() << std::endl;
+			 std::cout << "The Matrix is square and its trace is " << m.trace() << std::endl;
 		 }
 		 else
 		 {
-			 std::cout << "The matrix isn't square" << std::endl;
+			 std::cout << "The Matrix isn't square" << std::endl;
 		 }
 		 break;
-	 case SCALAR_TIMES_MATRIX:
+	 case SCALAR_TIMES_Matrix:
 		 resultMat = scalar * m;
 		 printResultMatrix(resultMat);
 		 break;
-	 case MATRIX_TIMES_SCALAR:
+	 case Matrix_TIMES_SCALAR:
 		 resultMat = m * scalar;
 		 printResultMatrix(resultMat);
 		 break;
@@ -184,23 +184,23 @@ void binaryOperation(const int operatorChoice)
 	std::cout << "Operation " << OPERATIONS[operatorChoice-1] 
 		  << " requires 2 operand matrices." << std::endl;
 
-	// Read the matrix information:
+	// Read the Matrix information:
 	int rows1, cols1, rows2, cols2;
 	std::vector<T> cells1;
 	std::vector<T> cells2;
 
-	std::cout << "Insert first matrix:" << std::endl;
+	std::cout << "Insert first Matrix:" << std::endl;
 	readMatrixInfo(rows1, cols1, cells1);
-	std::cout << "Insert second matrix:" << std::endl;
+	std::cout << "Insert second Matrix:" << std::endl;
 	readMatrixInfo(rows2, cols2, cells2);
 
 	Matrix<T> m1(rows1, cols1, cells1);
 	Matrix<T> m2(rows2, cols2, cells2);
 
-	std::cout << MAT_LINE << std::endl << "Got first matrix:" << std::endl;
+	std::cout << MAT_LINE << std::endl << "Got first Matrix:" << std::endl;
 	std::cout << m1;
 
-	std::cout << MAT_LINE << std::endl << "Got second matrix:" << std::endl;
+	std::cout << MAT_LINE << std::endl << "Got second Matrix:" << std::endl;
 	std::cout << m2;
 
 	Matrix<T> resultMat;
@@ -216,7 +216,7 @@ assert(m1==m1);
 		 }
 		 catch (std::exception& exception)
 		 {
-			 std::cout << "Got Exception from Matrix with message: " 
+			 std::cout << "Got Exception from Matrix with message: "
 				   << std::endl << exception.what() << std::endl;
 			 exit(1);
 		 }
@@ -225,12 +225,12 @@ assert(m1==m1);
 		 try
 		 {
 
-			 assert(m1.cols()==m2.rows());			 
+			 assert(m1.cols() == m2.rows());
 			 resultMat = m1 * m2;
 		 }
 		 catch (std::exception& exception)
 		 {
-			 std::cout << "Got Exception from Matrix with message: " 
+			 std::cout << "Got Exception from Matrix with message: "
 				   << std::endl << exception.what() << std::endl;
 			 exit(1);
 		 }
@@ -243,7 +243,7 @@ assert(m1==m1);
 template <typename T>
 void readMatrixInfo(int& rows, int& cols, std::vector<T>& cells)
 {
-	std::cout << "number of rows:";
+	std::cout << "number of myRows:";
 	getline(std::cin, g_line);
 	rows = atoi(g_line.c_str());
 
@@ -251,7 +251,7 @@ void readMatrixInfo(int& rows, int& cols, std::vector<T>& cells)
 	getline(std::cin, g_line);
 	cols = atoi(g_line.c_str());
 
-	std::cout << "Now insert the values of the matrix, row by row." << std::endl << 
+	std::cout << "Now insert the values of the Matrix, row by row." << std::endl <<
 		"After each cell add the char \'" << DELIM << "\'" << 
 		" (including after the last cell of a row)." << std::endl << 
 		"Each row should be in a separate line." << std::endl;
@@ -291,8 +291,8 @@ void getNumFromString(const std::string &str, Complex *num)
 	 std::istringstream iss(str);
 	 double r,i=0;
 	 iss>>r;
-	 bool b=(iss>>i);
-	 if (!b ){
+//	 bool b=(iss>>i);
+	 if (!iss ){
 	 	i=0;
 	 };
 	Complex number(r,i);
@@ -329,7 +329,7 @@ template <typename T>
 void printResultMatrix(const Matrix<T>& mat)
 {
 	std::cout << LINE << std::endl;
-	std::cout << "Resulted matrix:" << std::endl;
+	std::cout << "Resulted Matrix:" << std::endl;
 	std::cout << mat;
 }
 
